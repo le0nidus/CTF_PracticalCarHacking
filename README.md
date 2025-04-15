@@ -1,4 +1,4 @@
-# 🔓 CTF Writeup: CRC Cracking & Hitag2 RKE Attack
+# 🔓 CTF Writeup: Practical Car Hacking
 
 This repository documents my work on a CTF challenge focused on reverse-engineering and cryptographic attacks involving CRC and the Hitag2 Remote Keyless Entry (RKE) protocol.
 
