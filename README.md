@@ -8,8 +8,6 @@ This repository documents my work on a CTF challenge focused on reverse-engineer
 
 ## 💡 Challenge Overview
 
-The challenge consisted of two main components:
-
 ### 1. **CRC Challenge** `crc_cracker.py`
 - Given a CRC-based authentication mechanism and a stream of 15 messages
 - Each message consists of 1 MSB byte of crc, 3 bytes on data
