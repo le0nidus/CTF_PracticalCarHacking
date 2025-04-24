@@ -24,4 +24,10 @@ This repository documents my work on a CTF challenge focused on reverse-engineer
 - Recovered unique IDs (UIDs) and other fields from the RF packets 
 - Formatted the output to be a valid input to a hitag2 crack tool (used [crack5](https://github.com/RfidResearchGroup/proxmark3/tree/master/tools/hitag2crack))
 
+### 3. **AVTP Video** `avtp.py`
+- Given a pcapng file with SOME/IP & video stream packets, extract the video from the packets
+- Used code to extract payloads from relevant packets
+- Reconstructed binary file with proper payload
+- Used ffmpeg to convert the file to a video
+
 
