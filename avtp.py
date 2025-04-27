@@ -1,6 +1,14 @@
 from scapy.all import *  # Import all Scapy modules for packet parsing
 import ffmpeg            # Python wrapper for FFmpeg for video conversion
 
+
+def slice_reassembly(byte_after_header, payload, s_flag):
+    payload = payload[2:]  # Strip FU indicator + header
+    if s_flag == 1:
+        # Prepend start code and reconstructed NAL header
+        payload = b'\x00\x00\x00\x01' + byte_after_header + payload
+    return payload
+
 # File paths
 PCAP_FILE = "SOMEIP-002.pcapng"
 OUTPUT_BINARY_FILE = "output_stream.ts"      # Will store the raw NAL stream
@@ -27,16 +35,15 @@ with open(OUTPUT_BINARY_FILE, "wb") as f:
     for index, pkt in enumerate(filtered_packets):
         # Extract the raw bytes from the payload after the VLAN tag
         raw_data = bytes(pkt.getlayer(Dot1Q).payload)
-        avtp_payload = None
-
+        nal_payload = None
+        
         # If packet is too short, skip it
         if len(raw_data) < 22:
             print("Skipping packet ", index)
             continue
 
         # Extract payload length (2 bytes at offset 20–21)
-        payload_size = raw_data[20:22]
-        nal_msg_length = int.from_bytes(payload_size, byteorder='big')
+        nal_msg_length = int.from_bytes(raw_data[20:22], byteorder='big')
 
         # Extract the actual AVTP payload (starting from offset 24)
         avtp_payload = raw_data[24:24 + nal_msg_length]
@@ -45,28 +52,22 @@ with open(OUTPUT_BINARY_FILE, "wb") as f:
         FU_indicator = avtp_payload[0]   # First byte indicates fragment type
         FU_header = avtp_payload[1]      # Second byte has start/end flags
         s_flag = FU_header >> 7          # Start bit (1 if start of fragment)
-        e_flag = (FU_header >> 6) & 0x1  # End bit (1 if end of fragment)
+        # e_flag = (FU_header >> 6) & 0x1  # End bit (1 if end of fragment) - Used for debugging
 
         # Case: SPS or PPS NAL units (e.g., 0x67 = SPS, 0x68 = PPS)
         if FU_indicator == 0x67 or FU_indicator == 0x68:
             # Prepend Annex B start code
-            avtp_payload = b'\x00\x00\x00\x01' + avtp_payload
+            nal_payload = b'\x00\x00\x00\x01' + avtp_payload
 
         # Case: IDR slice reassembly
         elif FU_indicator == 0x7c:
             byte_after_start = b'\x65'  # NAL header for IDR slice
-            avtp_payload = avtp_payload[2:]  # Strip FU indicator + header
-            if s_flag == 1:
-                # Prepend start code and reconstructed NAL header
-                avtp_payload = b'\x00\x00\x00\x01' + byte_after_start + avtp_payload
+            nal_payload = slice_reassembly(byte_after_start, avtp_payload, s_flag)
 
         # Case: non-IDR slice reassembly
         elif FU_indicator == 0x5c:
             byte_after_start = b'\x41'  # NAL header for non-IDR slice
-            avtp_payload = avtp_payload[2:]  # Strip FU indicator + header
-            if s_flag == 1:
-                # Prepend start code and reconstructed NAL header
-                avtp_payload = b'\x00\x00\x00\x01' + byte_after_start + avtp_payload
+            nal_payload = slice_reassembly(byte_after_start, avtp_payload, s_flag)
 
         else:
             # Skip unrecognized or malformed packet
@@ -74,8 +75,8 @@ with open(OUTPUT_BINARY_FILE, "wb") as f:
             continue
 
         # Write the processed payload to the binary stream file
-        if avtp_payload:
-            f.write(avtp_payload)
+        if nal_payload:
+            f.write(nal_payload)
 
 # Step 3: Convert the NAL binary stream to MP4 using FFmpeg
 print("Converting to video now")
